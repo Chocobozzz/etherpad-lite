@@ -52,17 +52,18 @@ var globalPads = {
  */
 var padList = {
   list: new Set(),
+  cachedList: [],
   sorted : false,
   initiated: false,
   init: function(cb)
   {
-    db.findKeys("pad:*", "*:*:*", function(err, dbData)
+    db.findKeys("pad:*", "pad:*:*", function(err, dbData)
     {
       if(ERR(err, cb)) return;
       if(dbData != null){
         padList.initiated = true
         dbData.forEach(function(val){
-          padList.addPad(val.replace(/pad:/,""),false);
+          padList.addPad(val.replace(/^pad:/,""),false);
         });
         cb && cb()
       }
@@ -79,28 +80,23 @@ var padList = {
   getPads: function(cb){
     this.load(function() {
       if(!padList.sorted){
-        padList.list = padList.list.sort();
+        padList.cachedList = Array.from(padList.list).sort();
         padList.sorted = true;
       }
-      cb && cb(padList.list);
+      cb && cb(padList.cachedList);
     })
   },
   addPad: function(name)
   {
     if(!this.initiated) return;
-    if(this.list.indexOf(name) == -1){
-      this.list.push(name);
-      this.sorted=false;
-    }
+    this.list.add(name);
+    this.sorted=false;
   },
   removePad: function(name)
   {
     if(!this.initiated) return;
-    var index = this.list.indexOf(name);
-    if(index>-1){
-      this.list.splice(index,1);
-      this.sorted=false;
-    }
+    this.list.delete(name);
+    this.sorted=false;
   }
 };
 //initialises the allknowing data structure
