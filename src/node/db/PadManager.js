@@ -23,7 +23,7 @@ var customError = require("../utils/customError");
 var Pad = require("../db/Pad").Pad;
 var db = require("./DB").db;
 
-/** 
+/**
  * A cache of all loaded Pads.
  *
  * Provides "get" and "set" functions,
@@ -36,7 +36,7 @@ var db = require("./DB").db;
  */
 var globalPads = {
     get: function (name) { return this[':'+name]; },
-    set: function (name, value) 
+    set: function (name, value)
     {
       this[':'+name] = value;
     },
@@ -51,7 +51,7 @@ var globalPads = {
  * Updated without db access as new pads are created/old ones removed.
  */
 var padList = {
-  list: [],
+  list: new Set(),
   sorted : false,
   initiated: false,
   init: function(cb)
@@ -117,24 +117,24 @@ var padIdTransforms = [
 /**
  * Returns a Pad Object with the callback
  * @param id A String with the id of the pad
- * @param {Function} callback 
+ * @param {Function} callback
  */
 exports.getPad = function(id, text, callback)
-{    
+{
   //check if this is a valid padId
   if(!exports.isValidPadId(id))
   {
     callback(new customError(id + " is not a valid padId","apierror"));
     return;
   }
-  
+
   //make text an optional parameter
   if(typeof text == "function")
   {
     callback = text;
     text = null;
   }
-  
+
   //check if this is a valid text
   if(text != null)
   {
@@ -144,7 +144,7 @@ exports.getPad = function(id, text, callback)
       callback(new customError("text is not a string","apierror"));
       return;
     }
-    
+
     //check if text is less than 100k chars
     if(text.length > 100000)
     {
@@ -152,9 +152,9 @@ exports.getPad = function(id, text, callback)
       return;
     }
   }
-  
+
   var pad = globalPads.get(id);
-  
+
   //return pad if its already loaded
   if(pad != null)
   {
@@ -193,7 +193,7 @@ exports.doesPadExists = function(padId, callback)
     }
     else
     {
-      callback(null, false); 
+      callback(null, false);
     }
   });
 }
