@@ -623,7 +623,7 @@ Pad.prototype.remove = function remove(callback) {
         //is it a group pad? -> delete the entry of this pad in the group
         function(callback)
         {
-          if(padID.indexOf("$") === -1)
+          if(typeof(padID) !== 'undefined' && padID.indexOf("$") === -1)
           {
             // it isn't a group pad, nothing to do here
             callback();
@@ -676,12 +676,17 @@ Pad.prototype.remove = function remove(callback) {
         {
           var revHead = _this.head;
 
-          for(var i=0;i<=revHead;i++)
+          /*for(var i=0;i<=revHead;i++)
           {
             db.remove("pad:"+padID+":revs:"+i);
           }
 
-          callback();
+          callback();*/
+          // Don't overload write buffer if there are many revisions
+          async.timesLimit(revHead + 1, 500, function (i, next)
+          {
+            db.remove("pad:"+padID+":revs:"+i, null, next);
+          }, callback);
         },
         //remove pad from all authors who contributed
         function(callback)

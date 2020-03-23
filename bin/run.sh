@@ -35,5 +35,6 @@ bin/installDeps.sh $* || exit 1
 echo "Started Etherpad..."
 
 SCRIPTPATH=`pwd -P`
-exec node "$SCRIPTPATH/node_modules/ep_etherpad-lite/node/server.js" $*
+# exec node --max_old_space_size=8192 --optimize_for_size --stack_size=8192 "$SCRIPTPATH/node_modules/ep_etherpad-lite/node/server.js" $*
+exec node --inspect --max_old_space_size=8192 --optimize_for_size --stack_size=8192 "$SCRIPTPATH/node_modules/ep_etherpad-lite/node/server.js" $*
 

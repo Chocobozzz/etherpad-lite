@@ -274,27 +274,27 @@ exports.handleMessage = function(client, message)
       // FIXME: Allow to override readwrite access with readonly
 
       // Simulate using the load testing tool
-      if(!sessioninfos[client.id].auth){
+      if(sessioninfos[client.id] === undefined || !sessioninfos[client.id].auth){
         console.error("Auth was never applied to a session.  If you are using the stress-test tool then restart Etherpad and the Stress test tool.")
         return;
+      } else {
+        var auth = sessioninfos[client.id].auth;
+        var checkAccessCallback = function(err, statusObject)
+        {
+          if(ERR(err, callback)) return;
+
+          //access was granted
+          if(statusObject.accessStatus == "grant")
+          {
+            callback();
+          }
+          //no access, send the client a message that tell him why
+          else
+          {
+            client.json.send({accessStatus: statusObject.accessStatus})
+          }
+        };
       }
-
-      var auth = sessioninfos[client.id].auth;
-      var checkAccessCallback = function(err, statusObject)
-      {
-        if(ERR(err, callback)) return;
-
-        //access was granted
-        if(statusObject.accessStatus == "grant")
-        {
-          callback();
-        }
-        //no access, send the client a message that tell him why
-        else
-        {
-          client.json.send({accessStatus: statusObject.accessStatus})
-        }
-      };
 
       //check if pad is requested via readOnly
       if (auth.padID.indexOf("r.") === 0) {
@@ -836,63 +836,65 @@ exports.updatePadClients = function(pad, callback)
 
   //go trough all sessions on this pad
   async.forEach(roomClients, function(client, callback){
-    var sid = client.id;
-    //https://github.com/caolan/async#whilst
-    //send them all new changesets
-    async.whilst(
-      function (){ return sessioninfos[sid] && sessioninfos[sid].rev < pad.getHeadRevisionNumber()},
-      function(callback)
-      {
-        var r = sessioninfos[sid].rev + 1;
+    if (client !== undefined) {
+      var sid = client.id;
+      //https://github.com/caolan/async#whilst
+      //send them all new changesets
+      async.whilst(
+        function (){ return sessioninfos[sid] && sessioninfos[sid].rev < pad.getHeadRevisionNumber()},
+        function(callback)
+        {
+          var r = sessioninfos[sid].rev + 1;
 
-        async.waterfall([
-          function(callback) {
-            if(revCache[r])
-              callback(null, revCache[r]);
-            else
-              pad.getRevision(r, callback);
-          },
-          function(revision, callback)
-          {
-            revCache[r] = revision;
-
-            var author = revision.meta.author,
-                revChangeset = revision.changeset,
-                currentTime = revision.meta.timestamp;
-
-            // next if session has not been deleted
-            if(sessioninfos[sid] == null)
-              return callback(null);
-
-            if(author == sessioninfos[sid].author)
+          async.waterfall([
+            function(callback) {
+              if(revCache[r])
+                callback(null, revCache[r]);
+              else
+                pad.getRevision(r, callback);
+            },
+            function(revision, callback)
             {
-              client.json.send({"type":"COLLABROOM","data":{type:"ACCEPT_COMMIT", newRev:r}});
-            }
-            else
-            {
-              var forWire = Changeset.prepareForWire(revChangeset, pad.pool);
-              var wireMsg = {"type":"COLLABROOM",
-                             "data":{type:"NEW_CHANGES",
-                                     newRev:r,
-                                     changeset: forWire.translated,
-                                     apool: forWire.pool,
-                                     author: author,
-                                     currentTime: currentTime,
-                                     timeDelta: currentTime - sessioninfos[sid].time
-                                    }};
+              revCache[r] = revision;
 
-              client.json.send(wireMsg);
+              var author = revision.meta.author,
+                  revChangeset = revision.changeset,
+                  currentTime = revision.meta.timestamp;
+
+              // next if session has not been deleted
+              if(sessioninfos[sid] == null)
+                return callback(null);
+
+              if(author == sessioninfos[sid].author)
+              {
+                client.json.send({"type":"COLLABROOM","data":{type:"ACCEPT_COMMIT", newRev:r}});
+              }
+              else
+              {
+                var forWire = Changeset.prepareForWire(revChangeset, pad.pool);
+                var wireMsg = {"type":"COLLABROOM",
+                               "data":{type:"NEW_CHANGES",
+                                       newRev:r,
+                                       changeset: forWire.translated,
+                                       apool: forWire.pool,
+                                       author: author,
+                                       currentTime: currentTime,
+                                       timeDelta: currentTime - sessioninfos[sid].time
+                                      }};
+
+                client.json.send(wireMsg);
+              }
+              if(sessioninfos[sid]){
+                sessioninfos[sid].time = currentTime;
+                sessioninfos[sid].rev = r;
+              }
+              callback(null);
             }
-            if(sessioninfos[sid]){
-              sessioninfos[sid].time = currentTime;
-              sessioninfos[sid].rev = r;
-            }
-            callback(null);
-          }
-        ], callback);
-      },
-      callback
-    );
+          ], callback);
+        },
+        callback
+      );
+    }
   },callback);
 }
 
@@ -970,6 +972,13 @@ function createSessionInfo(client, message)
   // This information will be used to check if
   // the sessionId of this connection is still valid
   // since it could have been deleted by the API.
+  if (client.id === undefined || client.id === null) {
+      console.log(message.padId);
+      console.log(client);
+  }
+  if (sessioninfos[client.id] === undefined || sessioninfos[client.id] === null) {
+    sessioninfos[client.id] = {};
+  }
   sessioninfos[client.id].auth =
   {
     sessionID: message.sessionID,
@@ -1064,8 +1073,8 @@ function handleClientReady(client, message)
           authorManager.getAuthor(author, function(err, value)
           {
             if(ERR(err, callback)) return;
-            authorColorId = value.colorId;
-            authorName = value.name;
+            authorColorId = (value !== null) ? value.colorId : '#d97979';
+            authorName = (value !== null) ? value.name : 'inconnu';
             callback();
           });
         },
@@ -1129,12 +1138,14 @@ function handleClientReady(client, message)
       var roomClients = _getRoomClients(pad.id);
 
       async.forEach(roomClients, function(client, callback) {
-        var sinfo = sessioninfos[client.id];
-        if(sinfo && sinfo.author == author) {
-          // fix user's counter, works on page refresh or if user closes browser window and then rejoins
-          sessioninfos[client.id] = {};
-          client.leave(padIds.padId);
-          client.json.send({disconnect:"userdup"});
+        if (client !== undefined) {
+          var sinfo = sessioninfos[client.id];
+          if(sinfo && sinfo.author == author) {
+            // fix user's counter, works on page refresh or if user closes browser window and then rejoins
+            sessioninfos[client.id] = {};
+            client.leave(padIds.padId);
+            client.json.send({disconnect:"userdup"});
+          }
         }
       });
 
@@ -1395,13 +1406,13 @@ function handleClientReady(client, message)
         var author;
 
         //Jump over, if this session is the connection session
-        if(roomClient.id == client.id)
+        if(roomClient !== undefined && client !== undefined && roomClient.id == client.id)
           return callback();
 
 
         //Since sessioninfos might change while being enumerated, check if the
         //sessionID is still assigned to a valid session
-        if(sessioninfos[roomClient.id] !== undefined)
+        if(roomClient !== undefined && sessioninfos[roomClient.id] !== undefined)
           author = sessioninfos[roomClient.id].author;
         else // If the client id is not valid, callback();
           return callback();
@@ -1425,8 +1436,8 @@ function handleClientReady(client, message)
                 type: "USER_NEWINFO",
                 userInfo: {
                   "ip": "127.0.0.1",
-                  "colorId": authorInfo.colorId,
-                  "name": authorInfo.name,
+                  "colorId": (authorInfo !== null) ? authorInfo.colorId : '',
+                  "name": (authorInfo !== null) ? authorInfo.name : '',
                   "userAgent": "Anonymous",
                   "userId": author
                 }

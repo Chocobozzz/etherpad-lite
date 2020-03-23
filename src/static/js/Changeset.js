@@ -791,8 +791,10 @@ exports.textLinesMutator = function (lines) {
         }
       } else {
         var sline = putCurLineInSplice();
-        curSplice[sline] = curSplice[sline].substring(0, curCol) + text + curSplice[sline].substring(curCol);
-        curCol += text.length;
+        if (curSplice[sline] !== undefined) {
+          curSplice[sline] = curSplice[sline].substring(0, curCol) + text + curSplice[sline].substring(curCol);
+          curCol += text.length;
+        }
       }
       //debugPrint("insert");
     }
