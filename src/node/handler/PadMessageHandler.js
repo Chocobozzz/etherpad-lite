@@ -915,8 +915,8 @@ async function handleClientReady(client, message)
 
   // get all authordata of this new user
   let value = await authorManager.getAuthor(author);
-  let authorColorId = value.colorId;
-  let authorName = value.name;
+  let authorColorId = value ? value.colorId : '#d97979';
+  let authorName = value ? value.name : 'inconnu';
 
   // load the pad-object from the database
   let pad = await padManager.getPad(padIds.padId);
@@ -1196,8 +1196,8 @@ async function handleClientReady(client, message)
             type: "USER_NEWINFO",
             userInfo: {
               "ip": "127.0.0.1",
-              "colorId": authorInfo.colorId,
-              "name": authorInfo.name,
+              "colorId": authorInfo ? authorInfo.colorId : '',
+              "name": authorInfo ? authorInfo.name : '',
               "userAgent": "Anonymous",
               "userId": author
             }
