@@ -3374,7 +3374,7 @@ function Ace2Inner(){
       {
         try
         {
-          var newWindow = window.open(n.href, '_blank');
+          var newWindow = window.open(n.href, '_blank', 'noopener,noreferrer');
           newWindow.focus();
         }
         catch (e)
