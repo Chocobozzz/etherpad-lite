@@ -1177,7 +1177,7 @@ async function handleClientReady(client, message)
 
       // Since sessioninfos might change while being enumerated, check if the
       // sessionID is still assigned to a valid session
-      if (sessioninfos[roomClient.id] === undefined) {
+      if (sessioninfos[roomClient.id] === undefined || !sessioninfos[roomClient.id].author) {
         return;
       }
 
